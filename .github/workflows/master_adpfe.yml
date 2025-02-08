@@ -1,4 +1,6 @@
-# GitHub Actions Workflow para Build y Deploy de una Azure Function con Python 3.10
+# GitHub Actions Workflow - Build and deploy Python project to Azure Function App
+# Docs: https://aka.ms/python-webapps-actions
+
 name: Build and deploy Python project to Azure Function App - adpfe
 
 on:
@@ -8,8 +10,8 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: "." # Ruta al proyecto (ajustar si tu función está en un subdirectorio)
-  PYTHON_VERSION: "3.10" # Python 3.10 es soportado por Azure Functions
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: "." # Path to the project root for deployment
+  PYTHON_VERSION: "3.11" # Python version to use (supported: 3.6, 3.7, 3.8, 3.9, 3.11)
 
 jobs:
   build:
@@ -19,11 +21,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python version
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v2
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Create and start virtual environment
+      - name: Create and activate virtual environment
         run: |
           python -m venv venv
           source venv/bin/activate
@@ -33,14 +35,8 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests (optional)
-        run: |
-          echo "Running tests..."
-          # Agrega aquí tus comandos de test, por ejemplo: pytest
-
       - name: Zip artifact for deployment
-        run: |
-          zip -r release.zip . -x "venv/*" "*.git/*" "*.github/*" "__pycache__/*" "*.pytest_cache/*"
+        run: zip -r release.zip ./* -x 'venv/*'
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v3
@@ -53,7 +49,6 @@ jobs:
     needs: build
     environment:
       name: "Production"
-      url: ${{ steps.deploy-to-function.outputs.webapp-url }}
 
     steps:
       - name: Download artifact from build job
@@ -61,13 +56,15 @@ jobs:
         with:
           name: python-app
 
-      - name: Unzip artifact for deployment
+      - name: Unzip artifact
         run: unzip release.zip
 
-      - name: Deploy to Azure Functions
+      - name: "Deploy to Azure Functions"
         uses: Azure/functions-action@v1
         id: deploy-to-function
         with:
-          app-name: "adpfe" # Reemplaza con el nombre de tu Function App
+          app-name: "adpfe" # Replace with your Azure Function App name
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_4114B09BB7BE42B980A36621660E180F }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
+          scm-do-build-during-deployment: true
+          enable-oryx-build: true
